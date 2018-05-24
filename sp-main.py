@@ -1,42 +1,74 @@
 #!/usr/bin/env python3
 """
+@TODO: integrate flask support, so user can say "yes" to giving their info?
 """
 import sys
 import requests
 import requests.auth
 import string
 import re
+import flask
+
+app = flask.Flask(__name__)
 
 _USER_AGENT_ = "simpleSpotifyClient/0.1 by Zeke"
 
-def grabCredentials():
-    cI = ""
-    cISbase64 = ""
-    with open('client.id', 'r') as myFile:
-        cI = myFile.read().replace('\n', '')
-    with open('client.id_secret.64', 'r') as myFile:
-        cISbase64 = myFile.read().replace('\n', '')
-    return cI, cISbase64
+# needs to be space separated
+SCOPES = "playlist-read-private user-top-read user-read-recently-played" \
+        " user-library-read user-read-private"
 
-def spMain(arg):
-    cI, cISbase64 = grabCredentials()
-    print (cI)
+PORT = 8888
+
+REDIRECT_URI = "http://127.0.0.1:8888/callback"
+
+client_id = ""
+client_secret = ""
+client_is_base64 = ""
+
+def grabCredentials():
+    global client_id
+    global client_is_base64
+    global client_secret
+    with open('client.id', 'r') as myFile:
+        client_id = myFile.read().replace('\n', '')
+    with open('client.id_secret.64', 'r') as myFile:
+        client_is_base64 = myFile.read().replace('\n', '')
+    with open('client.secret', 'r') as myFile:
+        client_secret = myFile.read().replace('\n', '')
+
+@app.route('/')
+def home():
+    grabCredentials()
 
     headers = {"User-Agent": _USER_AGENT_}
-    get_data = {"client_id": cI, "response_type": "code", "redirect_uri": \
-                "http://127.0.0.1:8888/callback/"}
+    query_params = {"client_id": client_id, "response_type": "code", "redirect_uri": \
+                    REDIRECT_URI, "scope": SCOPES}
 
     response = requests.get("https://accounts.spotify.com/authorize",
                             headers=headers,
-                            params=get_data)
-    print (response.url)
-    print (response)
-    #print (response.json())
-    print (response.text)
+                            params=query_params)
+
+    return flask.redirect(response.url)
+
+@app.route('/callback')
+def callback():
+    authToken = flask.request.args['code']
+    # should also check for 'error' or 'state'
+
+    data = {"grant_type": "authorization_code", "redirect_uri": REDIRECT_URI,
+            "code": str(authToken), "client_id": client_id,
+            "client_secret": client_secret}
+    response = requests.post("https://accounts.spotify.com/api/token",
+                             data=data)
+    rJson = response.json()
+    tokenType = rJson['token_type']
+    accessToken = rJson['access_token']
+    refreshToken = rJson['refresh_token']
+
+    headers = {"Authorization": "{} {}".format(tokenType, accessToken)}
+    response = requests.get("https://api.spotify.com/v1/me", headers=headers)
+    print (response.json())
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print ("Usage: ./sp-main.py <arg1>")
-    else:
-        print ("Starting spotify client")
-        spMain(sys.argv[1])
+    print ("Starting spotify client")
+    app.run(debug=True, port=PORT)
