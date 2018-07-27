@@ -10,6 +10,8 @@ import requests.auth
 import string
 import re
 import flask
+import datetime
+import json
 
 app = flask.Flask(__name__)
 
@@ -17,7 +19,7 @@ _USER_AGENT_ = "simpleSpotifyClient/0.1 by Zeke"
 
 # needs to be space separated
 SCOPES = "playlist-read-private user-top-read user-read-recently-played" \
-        " user-library-read user-read-private"
+        " user-library-read user-read-private playlist-modify-private"
 PORT = 8888
 REDIRECT_URI = "http://127.0.0.1:8888/callback"
 
@@ -28,6 +30,57 @@ client_is_base64 = ""
 REFRESH_TOKEN = ""
 ACCESS_TOKEN = ""
 TOKEN_TYPE = ""
+
+def moveDiscoverSongsToPlaylist(userID, discoverID, madePlaylistJson, tracksJson):
+    """ POST https://api.spotify.com/v1/users/{user_id}/playlists/{playlist_id}/tracks """
+
+    uri = "https://api.spotify.com/v1/users/{}/playlists/{}/tracks".format(
+        userID, madePlaylistJson["id"])
+    headers = {"Authorization": "{} {}".format(TOKEN_TYPE, ACCESS_TOKEN),
+               "Content-Type": "application/json"}
+
+    uris = []
+    for item in tracksJson["items"]:
+        track = item["track"]
+        u = track["uri"]
+        uris.append(u)
+
+    # might have to put uris in str()
+    data = json.dumps({"uris": uris})
+
+    response = requests.post(uri, headers=headers, data=data)
+
+def doesPlaylistExistAlready(playlistName, userID):
+    """ """
+    uri = "https://api.spotify.com/v1/users/{}/playlists".format(userID)
+    headers = {"Authorization": "{} {}".format(TOKEN_TYPE, ACCESS_TOKEN)}
+    payload = {"limit": "50"}
+    response = requests.get(uri, headers=headers, params=payload)
+    rJson = response.json()
+
+    for item in rJson["items"]:
+        if item["name"] == playlistName:
+            return True
+    return False 
+
+
+def makePlaylist(userID):
+    """@TODO: check if playylist already exists"""
+
+    uri = "https://api.spotify.com/v1/users/{}/playlists".format(userID)
+    headers = {"Authorization": "{} {}".format(TOKEN_TYPE, ACCESS_TOKEN),
+               "Content-Type": "application/json"}
+    playlistName = "Discovered on {}".format(datetime.date.today())
+
+    alreadyExists = doesPlaylistExistAlready(playlistName, userID)
+    if alreadyExists:
+        return None
+
+    data = json.dumps({"name": playlistName, "public": "false"})
+
+    response = requests.post(uri, headers=headers, data=data)
+
+    return response.json()
 
 def grabCredentials():
     global client_id
@@ -122,6 +175,10 @@ def callback():
     userID = getUserID()
     print (userID)
     tracksJson = getDiscoverTracks(userID, discoverID)
+
+    madePlaylistJson = makePlaylist(userID)
+    if madePlaylistJson:
+        moveDiscoverSongsToPlaylist(userID, discoverID, madePlaylistJson, tracksJson)
 
     return str(tracksJson)
 
