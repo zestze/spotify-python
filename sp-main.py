@@ -40,6 +40,7 @@ def moveDiscoverSongsToPlaylist(userID, discoverID, madePlaylistJson, tracksJson
                "Content-Type": "application/json"}
 
     uris = []
+    #print (tracksJson)
     for item in tracksJson["items"]:
         track = item["track"]
         u = track["uri"]
@@ -61,7 +62,7 @@ def doesPlaylistExistAlready(playlistName, userID):
     for item in rJson["items"]:
         if item["name"] == playlistName:
             return True
-    return False 
+    return False
 
 
 def makePlaylist(userID):
@@ -119,15 +120,44 @@ def home():
     return flask.redirect(response.url)
 
 def getDiscoverID():
+    """
+    @TODO: need to pass a 'limit' of 50.
+            also store the name of the first playlist.
+            so if run into name of first playlist again, gone in a circle, and leave.
+    """
     headers = {"Authorization": "{} {}".format(TOKEN_TYPE, ACCESS_TOKEN)}
-    response = requests.get("https://api.spotify.com/v1/me/playlists", headers=headers)
+    query_params = {"limit": "50"}
+    response = requests.get("https://api.spotify.com/v1/me/playlists", headers=headers,
+                           params=query_params)
     rJson = response.json()
 
+    #print ("rjson: {}".format(rJson))
     playlistsList = rJson['items'] # is a list of dictionaries
+    #print ("palylistsList: {}".format(playlistsList))
+    first = True
+    firstID = ""
     for pJson in playlistsList:
+        if first:
+            firstID = pJson['id']
+        #print ("pJson['name'] == {}".format(pJson['name']))
         if pJson['name'] == 'Discover Weekly':
-            print (pJson)
+            #print (pJson)
             return pJson['id']
+
+    seenAll = False
+    while not seenAll:
+        response = requests.get("https://api.spotify.com/v1/me/playlists", headers=headers,
+                               params=query_params)
+        rJson = response.json()
+        playlistsList = rJson['items']
+        for pJson in playlistsList:
+            if pJson['id'] == firstID:
+                seenAll = True
+                break
+            if pJson['name'] == 'Discover Weekly':
+                return pjson['id']
+
+    raise Exception("Discover Weekly Playlist not found")
 
 def getUserID():
     headers = {"Authorization": "{} {}".format(TOKEN_TYPE, ACCESS_TOKEN)}
@@ -180,7 +210,8 @@ def callback():
     if madePlaylistJson:
         moveDiscoverSongsToPlaylist(userID, discoverID, madePlaylistJson, tracksJson)
 
-    return str(tracksJson)
+    #return str(tracksJson)
+    return "Successfully recorded Discover Playlist songs"
 
 if __name__ == "__main__":
     print ("Starting spotify client")
