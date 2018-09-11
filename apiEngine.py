@@ -66,11 +66,11 @@ class ApiEngine:
         return response.json()
 
     def grabCredentials(self):
-        with open('client.id', 'r') as myFile:
+        with open('cred/client.id', 'r') as myFile:
             self.clientID = myFile.read().replace('\n', '')
-        with open('client.id_secret.64', 'r') as myFile:
+        with open('cred/client.id_secret.64', 'r') as myFile:
             self.clientIdAndSecretBase64 = myFile.read().replace('\n', '')
-        with open('client.secret', 'r') as myFile:
+        with open('cred/client.secret', 'r') as myFile:
             self.clientSecret = myFile.read().replace('\n', '')
 
     def refreshToken(self):
