@@ -2,13 +2,11 @@
 """
 @TODO: refresh token function
 """
-import sys
 import requests
 import requests.auth
 import string
 import re
 import flask
-import datetime
 import json
 
 from apiEngine import ApiEngine
